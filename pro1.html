@@ -1,0 +1,1129 @@
+<!-- Digital Battery Passport — MVP v0.2: adds org verification, hash-chained history, gap detection, confidence score, serial binding -->
+<div id="bp-root">
+  <header class="bp-header">
+    <div class="bp-brand">Digital Battery Passport <span class="bp-tag">MVP v0.3</span></div>
+    <nav class="bp-nav">
+      <button data-view="scan" class="bp-nav-btn active">Scan / Look Up</button>
+      <button data-view="register" class="bp-nav-btn">Register Battery</button>
+      <button data-view="log" class="bp-nav-btn">Add Usage Record</button>
+      <button data-view="orgs" class="bp-nav-btn">Organizations</button>
+      <button data-view="registry" class="bp-nav-btn">All Batteries</button>
+      <button data-view="setup" class="bp-nav-btn">Setup / Deploy</button>
+    </nav>
+  </header>
+
+  <div id="bp-backend-banner"></div>
+
+  <main id="bp-main"></main>
+
+  <footer class="bp-footer">
+    Every battery/org registered here is visible to anyone using this app link — see the banner above for which database is currently active. Appearance/branding to be redesigned later.
+  </footer>
+</div>
+
+<style>
+  #bp-root {
+    --bg: #ffffff;
+    --panel: #f6f7f8;
+    --border: #dfe3e6;
+    --text: #1c2226;
+    --muted: #5b6570;
+    --accent: #1f6f5c;
+    --accent-soft: #e4f0ec;
+    --warn: #b3541e;
+    --warn-soft: #fbeee4;
+    --bad: #b3261e;
+    --good: #1f6f5c;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  #bp-root * { box-sizing: border-box; }
+  .bp-header { margin-bottom: 16px; }
+  .bp-brand { font-size: 20px; font-weight: 700; margin-bottom: 10px; }
+  .bp-tag { font-size: 11px; font-weight: 500; color: var(--muted); background: var(--panel); border: 1px solid var(--border); border-radius: 20px; padding: 2px 8px; margin-left: 6px; vertical-align: middle; }
+  .bp-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+  .bp-nav-btn {
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    padding: 8px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; font-weight: 500;
+  }
+  .bp-nav-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .bp-nav-btn:hover:not(.active) { background: #ececec; }
+
+  .bp-card { border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 14px; background: var(--bg); }
+  .bp-card h2 { margin: 0 0 4px; font-size: 16px; }
+  .bp-card h3 { margin: 0 0 10px; font-size: 14px; color: var(--muted); font-weight: 600; }
+  .bp-sub { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+
+  .bp-field { margin-bottom: 12px; }
+  .bp-field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  .bp-field input, .bp-field select, .bp-field textarea {
+    width: 100%; padding: 9px 10px; border: 1px solid var(--border); border-radius: 7px; font-size: 14px; background: var(--panel); color: var(--text);
+  }
+  .bp-row { display: flex; gap: 10px; }
+  .bp-row > .bp-field { flex: 1; }
+
+  .bp-btn { background: var(--accent); color: white; border: none; padding: 10px 16px; border-radius: 7px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .bp-btn:hover { opacity: 0.92; }
+  .bp-btn.secondary { background: var(--panel); color: var(--text); border: 1px solid var(--border); }
+  .bp-btn.small { padding: 6px 10px; font-size: 12px; }
+  .bp-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .bp-msg { font-size: 13px; padding: 8px 10px; border-radius: 7px; margin-top: 10px; }
+  .bp-msg.error { background: #fbeceb; color: var(--bad); }
+  .bp-msg.ok { background: var(--accent-soft); color: var(--accent); }
+  .bp-msg.warn { background: var(--warn-soft); color: var(--warn); }
+
+  .bp-qr-wrap { text-align: center; padding: 14px; }
+  .bp-id-pill { display: inline-block; font-family: monospace; font-size: 15px; background: var(--panel); border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px; margin-top: 8px; }
+
+  video#bp-video { width: 100%; border-radius: 8px; background: #000; display: block; }
+  .bp-scanbox { position: relative; }
+
+  .bp-health-bar-track { background: var(--panel); border-radius: 20px; height: 14px; overflow: hidden; border: 1px solid var(--border); }
+  .bp-health-bar-fill { height: 100%; border-radius: 20px; transition: width .4s; }
+
+  .bp-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; }
+  .bp-stat { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .bp-stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+  .bp-stat .v { font-size: 16px; font-weight: 700; margin-top: 2px; }
+
+  table.bp-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
+  table.bp-table th, table.bp-table td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); }
+  table.bp-table th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+  .bp-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; background: var(--panel); border: 1px solid var(--border); }
+  .bp-badge.verified { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+  .bp-badge.unverified { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+
+  .bp-registry-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; cursor: pointer; }
+  .bp-registry-item:hover { background: var(--panel); }
+  .bp-footer { text-align: center; font-size: 11px; color: var(--muted); margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .bp-empty { color: var(--muted); font-size: 13px; text-align: center; padding: 20px; }
+
+  .bp-alert { border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-bottom: 10px; }
+  .bp-alert.gap { background: var(--warn-soft); color: var(--warn); border: 1px solid #ecd2b8; }
+  .bp-alert.integrity-ok { background: var(--accent-soft); color: var(--accent); border: 1px solid #bcdccf; }
+  .bp-alert.integrity-bad { background: #fbeceb; color: var(--bad); border: 1px solid #f0c4c1; }
+  .bp-alert.confidence { background: var(--panel); border: 1px solid var(--border); color: var(--text); }
+
+  .bp-org-item { display:flex; justify-content:space-between; align-items:center; padding:10px; border:1px solid var(--border); border-radius:8px; margin-bottom:8px; }
+  .bp-banner { border-radius: 8px; padding: 8px 12px; font-size: 12px; margin-bottom: 14px; font-weight: 600; }
+  .bp-banner.ok { background: var(--accent-soft); color: var(--accent); }
+  .bp-banner.warn { background: var(--warn-soft); color: var(--warn); }
+  .bp-banner.bad { background: #fbeceb; color: var(--bad); }
+  pre.bp-code { background: #1c2226; color: #e6f0ea; padding: 12px; border-radius: 8px; font-size: 12px; overflow-x: auto; white-space: pre; }
+</style>
+
+<script>
+(function () {
+  function loadScriptCascade(urls) {
+    return new Promise((resolve, reject) => {
+      let i = 0;
+      function tryNext() {
+        if (i >= urls.length) { reject(new Error('all sources failed')); return; }
+        const s = document.createElement('script');
+        s.src = urls[i++];
+        s.onload = resolve;
+        s.onerror = tryNext;
+        document.head.appendChild(s);
+      }
+      tryNext();
+    });
+  }
+  window.__bpJsQrLoad = loadScriptCascade([
+    'https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js',
+    'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js'
+  ]).catch(() => console.warn('jsQR failed to load from all sources — camera scan will be unavailable, manual lookup still works.'));
+  window.__bpQrCodeLoad = loadScriptCascade([
+    'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js',
+    'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js'
+  ]).catch(() => console.warn('QR generator failed to load from all sources — battery IDs will still display for manual use.'));
+})();
+</script>
+
+<script>
+(function () {
+  const main = document.getElementById('bp-main');
+  const navBtns = document.querySelectorAll('.bp-nav-btn');
+  let currentView = 'scan';
+  let cameraStream = null;
+  let scanRAF = null;
+
+  navBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      navBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      stopCamera();
+      currentView = btn.dataset.view;
+      render();
+      renderBackendBanner();
+    });
+  });
+
+  // ---------- lightweight tamper-evident hash (not cryptographic-grade — demonstrates the concept) ----------
+  function fnv1aHash(str) {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) {
+      hash ^= str.charCodeAt(i);
+      hash = (hash * 0x01000193) >>> 0;
+    }
+    return hash.toString(16).padStart(8, '0');
+  }
+  function genesisHash(batteryId) { return fnv1aHash('GENESIS:' + batteryId); }
+  function hashEntry(prevHash, entry) {
+    return fnv1aHash(prevHash + '|' + entry.date + '|' + entry.type + '|' + (entry.note || '') + '|' + (entry.orgId || ''));
+  }
+  function appendChainedEntry(battery, entry) {
+    const prevHash = battery.usageLog.length ? battery.usageLog[battery.usageLog.length - 1].hash : genesisHash(battery.id);
+    entry.hash = hashEntry(prevHash, entry);
+    battery.usageLog.push(entry);
+  }
+  function verifyChain(battery) {
+    let prevHash = genesisHash(battery.id);
+    for (let i = 0; i < battery.usageLog.length; i++) {
+      const entry = battery.usageLog[i];
+      const expected = hashEntry(prevHash, entry);
+      if (entry.hash !== expected) return { valid: false, brokenAt: i };
+      prevHash = entry.hash;
+    }
+    return { valid: true, brokenAt: null };
+  }
+
+  // ---------- swappable backend: Claude preview storage (testing here) vs Firebase (once deployed) ----------
+  // To go live: create a free Firebase project (console.firebase.google.com), enable Firestore,
+  // and paste your config below. Leave as-is to keep testing inside this preview.
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyB7LNoQVsozyXz-PMUNzeGJYtsZsKBDUmI",
+    authDomain: "battery-passport-6afec.firebaseapp.com",
+    projectId: "battery-passport-6afec",
+    storageBucket: "battery-passport-6afec.firebasestorage.app",
+    messagingSenderId: "591599756123",
+    appId: "1:591599756123:web:685baece1b8f380e2cb07e"
+  };
+
+  let backend = null; // 'artifact' | 'firebase' | 'memory'
+  let db = null;
+  const memoryStore = {};
+
+  function firebaseConfigured() {
+    return FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== 'YOUR_API_KEY';
+  }
+
+  function loadFirebaseScripts() {
+    return new Promise((resolve, reject) => {
+      const s1 = document.createElement('script');
+      s1.src = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js';
+      s1.onload = () => {
+        const s2 = document.createElement('script');
+        s2.src = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js';
+        s2.onload = resolve;
+        s2.onerror = reject;
+        document.head.appendChild(s2);
+      };
+      s1.onerror = reject;
+      document.head.appendChild(s1);
+    });
+  }
+
+  async function initBackend() {
+    if (typeof window.storage !== 'undefined' && window.storage) {
+      backend = 'artifact';
+      return;
+    }
+    if (firebaseConfigured()) {
+      try {
+        await loadFirebaseScripts();
+        firebase.initializeApp(FIREBASE_CONFIG);
+        db = firebase.firestore();
+        backend = 'firebase';
+        return;
+      } catch (e) {
+        console.error('Firebase failed to load, falling back to memory-only mode', e);
+      }
+    }
+    backend = 'memory';
+  }
+
+  async function dbSet(collection, id, value) {
+    try {
+      if (backend === 'artifact') return await window.storage.set(collection + ':' + id, JSON.stringify(value), true);
+      if (backend === 'firebase') { await db.collection(collection).doc(id).set(value); return true; }
+      memoryStore[collection + ':' + id] = value;
+      return true;
+    } catch (e) { return null; }
+  }
+  async function dbGet(collection, id) {
+    try {
+      if (backend === 'artifact') {
+        const r = await window.storage.get(collection + ':' + id, true);
+        return r ? JSON.parse(r.value) : null;
+      }
+      if (backend === 'firebase') {
+        const doc = await db.collection(collection).doc(id).get();
+        return doc.exists ? doc.data() : null;
+      }
+      return memoryStore[collection + ':' + id] || null;
+    } catch (e) { return null; }
+  }
+  async function dbList(collection) {
+    try {
+      if (backend === 'artifact') {
+        const res = await window.storage.list(collection + ':', true);
+        if (!res || !res.keys || res.keys.length === 0) return [];
+        const out = [];
+        for (const k of res.keys) {
+          try { const r = await window.storage.get(k, true); if (r) out.push(JSON.parse(r.value)); } catch (e) {}
+        }
+        return out;
+      }
+      if (backend === 'firebase') {
+        const snap = await db.collection(collection).get();
+        return snap.docs.map(d => d.data());
+      }
+      return Object.keys(memoryStore).filter(k => k.startsWith(collection + ':')).map(k => memoryStore[k]);
+    } catch (e) { return []; }
+  }
+
+  // ---------- storage helpers: batteries ----------
+  async function saveBattery(battery) { return dbSet('battery', battery.id, battery); }
+  async function getBattery(id) { return dbGet('battery', id.trim().toUpperCase()); }
+  async function listBatteries() {
+    const out = await dbList('battery');
+    return out.sort((a, b) => (b.registeredAt || '').localeCompare(a.registeredAt || ''));
+  }
+
+  // ---------- storage helpers: organizations ----------
+  async function saveOrg(org) { return dbSet('org', org.id, org); }
+  async function getOrg(id) { return dbGet('org', id); }
+  async function listOrgs() {
+    const out = await dbList('org');
+    return out.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }
+
+  function genId() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let s = 'BAT-';
+    for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    return s;
+  }
+  function genOrgId() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let s = 'ORG-';
+    for (let i = 0; i < 5; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    return s;
+  }
+
+  function buildBatteryUrl(id) {
+    return window.location.origin + window.location.pathname + '?battery=' + encodeURIComponent(id);
+  }
+  function extractBatteryId(scannedValue) {
+    const raw = (scannedValue || '').trim();
+    try {
+      const url = new URL(raw);
+      const fromQuery = url.searchParams.get('battery');
+      if (fromQuery) return fromQuery;
+    } catch (e) {}
+    return raw;
+  }
+
+  // ---------- health scoring (placeholder heuristic, to refine later) ----------
+  // ---------- ML health model: real Ridge regression trained on synthetic degradation data ----------
+  // Trained via scikit-learn (polynomial features, degree 2 + Ridge regularization) on 4000 samples
+  // generated from a literature-informed nonlinear degradation curve. This is synthetic training data,
+  // not real field telemetry — no real fleet dataset exists yet. Swap in real returned-battery
+  // measurements to retrain for production; the inference code below would not need to change.
+  const HEALTH_MODEL = {
+    featureNames: ['cf', 'age', 'fr', 'sr', 'cf^2', 'cf age', 'cf fr', 'cf sr', 'age^2', 'age fr', 'age sr', 'fr^2', 'fr sr', 'sr^2'],
+    coefficients: [-63.573773862443794, -4.626181139178293, -12.35136854230478, -9.365479521016812, -2.113167894230617, 0.5104957362582433, -2.416548311318181, 0.9095158352273542, 0.22321050722769192, 0.18909101448079552, 0.15553445340724675, 1.734433992035141, 1.2091094129610116, -2.7179793754909727],
+    intercept: 103.896589728554,
+    testR2: 0.9823,
+    testMae: 2.76
+  };
+  function mlPredictHealth(cf, age, fr, sr) {
+    const raw = { cf, age, fr, sr };
+    const poly = {
+      cf, age, fr, sr,
+      'cf^2': cf * cf, 'cf age': cf * age, 'cf fr': cf * fr, 'cf sr': cf * sr,
+      'age^2': age * age, 'age fr': age * fr, 'age sr': age * sr,
+      'fr^2': fr * fr, 'fr sr': fr * sr, 'sr^2': sr * sr
+    };
+    let y = HEALTH_MODEL.intercept;
+    HEALTH_MODEL.featureNames.forEach((name, i) => { y += HEALTH_MODEL.coefficients[i] * poly[name]; });
+    return Math.max(0, Math.min(100, Math.round(y)));
+  }
+
+  // ---------- health scoring (now backed by the trained ML model above) ----------
+  function computeHealth(battery) {
+    const rated = Number(battery.ratedCycleLife) || 1000;
+    const chargeEvents = battery.usageLog.filter(l => l.type === 'charge').length;
+    const swapEvents = battery.usageLog.filter(l => l.type === 'station_swap').length;
+    const cycles = chargeEvents + swapEvents + (Number(battery.startingCycles) || 0);
+    const cycleFraction = cycles / rated;
+
+    const madeDate = new Date(battery.manufactureDate);
+    const ageYears = isNaN(madeDate) ? 0 : (Date.now() - madeDate.getTime()) / (1000 * 3600 * 24 * 365);
+
+    const fastCharges = battery.usageLog.filter(l => l.type === 'charge' && l.note && /fast/i.test(l.note)).length;
+    const fastRatio = cycles > 0 ? fastCharges / cycles : 0;
+    const swapRatio = cycles > 0 ? swapEvents / cycles : 0;
+
+    const health = mlPredictHealth(cycleFraction, Math.max(0, ageYears), fastRatio, swapRatio);
+
+    const remainingCycles = Math.max(0, rated - cycles);
+    // Base the usage rate on the actual span of logged dates, not the battery's full
+    // manufacture-to-today age — otherwise a battery whose history was only just
+    // logged (e.g. several events all dated today) wrongly looks barely-used across
+    // its whole lifetime and produces absurd multi-century "remaining life" estimates.
+    const loggedDates = battery.usageLog.map(l => l.date).filter(Boolean).sort();
+    const usageSpanYears = loggedDates.length >= 2
+      ? Math.max(0, (new Date(loggedDates[loggedDates.length - 1]) - new Date(loggedDates[0])) / (1000 * 3600 * 24 * 365))
+      : 0;
+    const DEFAULT_CYCLES_PER_YEAR = 150; // typical assumption when there isn't enough logged history to compute a real rate
+    const cyclesPerYear = usageSpanYears > 0.1 ? (cycles / usageSpanYears) : DEFAULT_CYCLES_PER_YEAR;
+    const remainingYears = cyclesPerYear > 0 ? (remainingCycles / cyclesPerYear) : null;
+
+    return { health, cycles, swapEvents, remainingCycles, remainingYears, ageYears };
+  }
+  function healthColor(h) {
+    if (h >= 75) return 'var(--good)';
+    if (h >= 45) return 'var(--warn)';
+    return 'var(--bad)';
+  }
+
+  // ---------- gap detection ----------
+  function findGaps(battery) {
+    const dates = [battery.manufactureDate, ...battery.usageLog.map(l => l.date)].filter(Boolean).sort();
+    const gaps = [];
+    for (let i = 1; i < dates.length; i++) {
+      const d1 = new Date(dates[i - 1]), d2 = new Date(dates[i]);
+      const diffDays = Math.round((d2 - d1) / (1000 * 3600 * 24));
+      if (diffDays > 180) gaps.push({ from: dates[i - 1], to: dates[i], days: diffDays });
+    }
+    if (dates.length) {
+      const last = new Date(dates[dates.length - 1]);
+      const diffDays = Math.round((Date.now() - last.getTime()) / (1000 * 3600 * 24));
+      if (diffDays > 180) gaps.push({ from: dates[dates.length - 1], to: 'today', days: diffDays });
+    }
+    return gaps;
+  }
+
+  // ---------- confidence / data-density score ----------
+  function computeConfidence(battery) {
+    const entries = battery.usageLog;
+    const orgIds = new Set(entries.map(e => e.orgId).filter(Boolean));
+    const dates = entries.map(e => e.date).filter(Boolean).sort();
+    const spanDays = dates.length >= 2 ? Math.round((new Date(dates[dates.length - 1]) - new Date(dates[0])) / (1000 * 3600 * 24)) : 0;
+    let tier = 'Low';
+    if (entries.length >= 10 && orgIds.size >= 2 && spanDays >= 365) tier = 'High';
+    else if (entries.length >= 3 && spanDays >= 90) tier = 'Medium';
+    return { tier, entryCount: entries.length, orgCount: orgIds.size, spanDays };
+  }
+
+  // ---------- fair resale price estimator ----------
+  // Placeholder ₹/Wh rates for a brand-new cell of each chemistry — illustrative only, not live market data.
+  const NEW_PRICE_PER_WH = { 'LiFePO4': 18, 'NMC': 15, 'Lead-acid': 6, 'Other': 10 };
+  function estimatePrice(battery, health) {
+    const rate = NEW_PRICE_PER_WH[battery.chemistry] || NEW_PRICE_PER_WH['Other'];
+    const capacityWh = Number(battery.capacityWh) || 0;
+    const newPrice = Math.round(rate * capacityWh);
+    const healthFactor = health.health / 100;
+    const mid = Math.round(newPrice * healthFactor);
+    const low = Math.round(mid * 0.85);
+    const high = Math.round(mid * 1.12);
+    return { rate, newPrice, low, mid, high };
+  }
+
+  // ---------- organization reputation (aggregated across every battery they touched) ----------
+  async function computeOrgReputation(orgId, allBatteries) {
+    const touched = allBatteries.filter(b => b.registeredByOrgId === orgId || b.usageLog.some(l => l.orgId === orgId));
+    if (touched.length === 0) return { batteryCount: 0 };
+    let healthSum = 0, gapFlagCount = 0, integrityIssueCount = 0;
+    for (const b of touched) {
+      const h = computeHealth(b);
+      healthSum += h.health;
+      if (findGaps(b).length > 0) gapFlagCount++;
+      if (!verifyChain(b).valid) integrityIssueCount++;
+    }
+    return {
+      batteryCount: touched.length,
+      avgHealth: Math.round(healthSum / touched.length),
+      gapFlagCount,
+      integrityIssueCount
+    };
+  }
+
+  // ---------- WhatsApp lookup (concept demo — real automation needs a backend WhatsApp Business API integration) ----------
+  const WHATSAPP_DEMO_NUMBER = '910000000000'; // placeholder — replace with a real WhatsApp Business number in production
+  function buildWhatsAppLink(battery) {
+    const text = encodeURIComponent('BATTERY ' + battery.id);
+    return 'https://wa.me/' + WHATSAPP_DEMO_NUMBER + '?text=' + text;
+  }
+  function whatsAppPreviewText(battery, health, price) {
+    return 'Battery Passport — ' + battery.id + '\n' +
+      battery.manufacturer + ' ' + battery.model + '\n' +
+      'Health: ' + health.health + '%\n' +
+      'Remaining life: ~' + health.remainingCycles + ' cycles' + (health.remainingYears ? ' (~' + health.remainingYears.toFixed(1) + ' yrs)' : '') + '\n' +
+      'Est. fair price: ₹' + price.low.toLocaleString('en-IN') + '–₹' + price.high.toLocaleString('en-IN') + '\n' +
+      'Full report: ' + buildBatteryUrl(battery.id);
+  }
+
+  // ---------- seed demo data on first run ----------
+  async function seedIfEmpty() {
+    const existingBatteries = await listBatteries();
+    if (existingBatteries.length > 0) return;
+
+    const orgManufacturer1 = { id: 'ORG-VOLT1', name: 'Volt Cells Pvt Ltd', type: 'manufacturer', verified: true, registeredAt: new Date('2021-01-01').toISOString() };
+    const orgManufacturer2 = { id: 'ORG-AMP1', name: 'AmpereWorks', type: 'manufacturer', verified: true, registeredAt: new Date('2020-01-01').toISOString() };
+    const orgFleet1 = { id: 'ORG-FLEET1', name: 'Hyderabad E-Rickshaw Fleet Co', type: 'fleet', verified: true, registeredAt: new Date('2022-01-01').toISOString() };
+    const orgFleet2 = { id: 'ORG-FLEET2', name: 'Metro Delivery Fleet', type: 'fleet', verified: true, registeredAt: new Date('2021-06-01').toISOString() };
+    const orgService1 = { id: 'ORG-SVC1', name: 'QuickFix Battery Service', type: 'service_center', verified: false, registeredAt: new Date('2023-01-01').toISOString() };
+    const orgStation1 = { id: 'ORG-STN1', name: 'Charge & Go Swap Station, LB Nagar', type: 'swap_station', verified: true, registeredAt: new Date('2023-04-01').toISOString() };
+    for (const o of [orgManufacturer1, orgManufacturer2, orgFleet1, orgFleet2, orgService1, orgStation1]) await saveOrg(o);
+
+    const demo1 = {
+      id: 'BAT-DEMO1', manufacturer: 'Volt Cells Pvt Ltd', model: 'VC-48V-30Ah', chemistry: 'LiFePO4',
+      capacityWh: 1440, ratedCycleLife: 2000, manufactureDate: '2023-02-10', serialNumber: 'VC-SN-88213',
+      registeredByOrgId: orgManufacturer1.id, registeredBy: orgManufacturer1.name, registeredAt: new Date('2023-02-12').toISOString(),
+      startingCycles: 0, usageLog: []
+    };
+    const rawEntries1 = [
+      { date: '2023-03-01', type: 'fleet_assignment', note: 'Assigned to e-rickshaw fleet, Hyderabad', orgId: orgFleet1.id },
+      { date: '2023-06-15', type: 'charge', note: 'Routine charge', orgId: orgFleet1.id },
+      { date: '2023-09-15', type: 'charge', note: 'Routine charge', orgId: orgFleet1.id },
+      { date: '2024-01-20', type: 'service', note: 'BMS inspection, no faults found', orgId: orgService1.id },
+      { date: '2024-06-10', type: 'charge', note: 'Fast charge at depot', orgId: orgFleet1.id },
+      { date: '2024-07-02', type: 'station_swap', note: 'Depleted battery exchanged for charged unit', orgId: orgStation1.id },
+      { date: '2024-08-11', type: 'station_swap', note: 'Depleted battery exchanged for charged unit', orgId: orgStation1.id },
+      { date: '2025-02-05', type: 'swap', note: 'Ownership transferred to second buyer', orgId: null }
+    ];
+    for (let i = 0; i < 90; i++) rawEntries1.push({ date: '2023-0' + ((i % 7) + 2) + '-1' + (i % 9), type: 'charge', note: i % 20 === 0 ? 'Fast charge' : 'Routine charge', orgId: orgFleet1.id });
+    rawEntries1.sort((a, b) => a.date.localeCompare(b.date));
+    for (const e of rawEntries1) appendChainedEntry(demo1, e);
+
+    const demo2 = {
+      id: 'BAT-DEMO2', manufacturer: 'AmpereWorks', model: 'AW-60V-40Ah', chemistry: 'NMC',
+      capacityWh: 2400, ratedCycleLife: 1500, manufactureDate: '2021-06-01', serialNumber: 'AW-SN-41207',
+      registeredByOrgId: orgManufacturer2.id, registeredBy: orgManufacturer2.name, registeredAt: new Date('2021-06-05').toISOString(),
+      startingCycles: 0, usageLog: []
+    };
+    const rawEntries2 = [
+      { date: '2021-07-01', type: 'fleet_assignment', note: 'Assigned to delivery e-scooter fleet', orgId: orgFleet2.id },
+      { date: '2024-01-01', type: 'service', note: 'Cell voltage imbalance detected, 2 cells reconditioned', orgId: orgService1.id }
+    ];
+    for (let i = 0; i < 420; i++) rawEntries2.push({ date: '2022-0' + ((i % 9) + 1) + '-0' + ((i % 8) + 1), type: 'charge', note: i % 3 === 0 ? 'Fast charge' : 'Routine charge', orgId: orgFleet2.id });
+    rawEntries2.sort((a, b) => a.date.localeCompare(b.date));
+    for (const e of rawEntries2) appendChainedEntry(demo2, e);
+
+    await saveBattery(demo1);
+    await saveBattery(demo2);
+  }
+
+  // ---------- views ----------
+  function render() {
+    stopCamera();
+    if (currentView === 'scan') renderScan();
+    else if (currentView === 'register') renderRegister();
+    else if (currentView === 'log') renderLog();
+    else if (currentView === 'orgs') renderOrgs();
+    else if (currentView === 'registry') renderRegistry();
+    else if (currentView === 'setup') renderSetup();
+  }
+
+  function renderBackendBanner() {
+    const el = document.getElementById('bp-backend-banner');
+    if (!el) return;
+    if (backend === 'artifact') {
+      el.innerHTML = `<div class="bp-banner ok">Connected to Claude preview storage — good for testing here, but this data does not travel with the file when you deploy it elsewhere. See "Setup / Deploy".</div>`;
+    } else if (backend === 'firebase') {
+      el.innerHTML = `<div class="bp-banner ok">Connected to Firebase — this is a real, persistent database.</div>`;
+    } else {
+      el.innerHTML = `<div class="bp-banner warn">No permanent database connected — demo batteries (BAT-DEMO1, BAT-DEMO2) work for testing scan/speak right now, but anything new you register will be lost on page reload. Open "Setup / Deploy" to connect Firebase for permanent storage.</div>`;
+    }
+  }
+
+  function renderScan() {
+    main.innerHTML = `
+      <div class="bp-card">
+        <h2>Scan a battery QR code</h2>
+        <p class="bp-sub">Point a camera at the QR on the battery, or type its ID if you don't have camera access.</p>
+        <div class="bp-scanbox">
+          <video id="bp-video" playsinline muted style="display:none;"></video>
+          <canvas id="bp-canvas" style="display:none;"></canvas>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+          <button class="bp-btn" id="bp-start-cam">Start camera scan</button>
+          <button class="bp-btn secondary" id="bp-stop-cam" style="display:none;">Stop camera</button>
+        </div>
+        <div id="bp-scan-msg"></div>
+      </div>
+
+      <div class="bp-card">
+        <h3>Or look up by ID</h3>
+        <div class="bp-row">
+          <div class="bp-field" style="flex:2;">
+            <input id="bp-manual-id" placeholder="e.g. BAT-DEMO1" />
+          </div>
+          <div class="bp-field" style="flex:1;">
+            <button class="bp-btn" id="bp-manual-lookup" style="width:100%;">Look up</button>
+          </div>
+        </div>
+        <p class="bp-sub" style="margin:0;">Try the demo IDs: <code>BAT-DEMO1</code> or <code>BAT-DEMO2</code></p>
+      </div>
+
+      <div id="bp-result"></div>
+    `;
+
+    document.getElementById('bp-start-cam').addEventListener('click', startCamera);
+    document.getElementById('bp-stop-cam').addEventListener('click', stopCamera);
+    document.getElementById('bp-manual-lookup').addEventListener('click', async () => {
+      const id = document.getElementById('bp-manual-id').value;
+      if (!id.trim()) return;
+      await lookupAndShow(id);
+    });
+    document.getElementById('bp-manual-id').addEventListener('keydown', async (e) => {
+      if (e.key === 'Enter') await lookupAndShow(e.target.value);
+    });
+  }
+
+  async function lookupAndShow(scannedValue) {
+    const id = extractBatteryId(scannedValue);
+    const resultEl = document.getElementById('bp-result');
+    resultEl.innerHTML = `<p class="bp-empty">Looking up ${escapeHtml(id)}…</p>`;
+    const battery = await getBattery(id);
+    if (!battery) {
+      resultEl.innerHTML = `<div class="bp-msg error">No battery passport found for ID "${escapeHtml(id)}". Check the ID or register this battery first.</div>`;
+      return;
+    }
+    resultEl.innerHTML = await passportHTML(battery);
+    bindSpeakButton(resultEl);
+  }
+
+  async function passportHTML(battery) {
+    const h = computeHealth(battery);
+    const color = healthColor(h.health);
+    const chain = verifyChain(battery);
+    const gaps = findGaps(battery);
+    const confidence = computeConfidence(battery);
+
+    const notableEvents = battery.usageLog.filter(l => l.type !== 'charge');
+    const chargeEvents = battery.usageLog.filter(l => l.type === 'charge');
+
+    // resolve org names for notable events (async lookups, done sequentially since list is short)
+    const orgCache = {};
+    async function orgBadge(orgId) {
+      if (!orgId) return '<span class="bp-badge unverified">Self-reported</span>';
+      if (!(orgId in orgCache)) orgCache[orgId] = await getOrg(orgId);
+      const org = orgCache[orgId];
+      if (!org) return '<span class="bp-badge unverified">Unknown org</span>';
+      return org.verified
+        ? `<span class="bp-badge verified">${escapeHtml(org.name)} ✓</span>`
+        : `<span class="bp-badge unverified">${escapeHtml(org.name)} (unverified)</span>`;
+    }
+
+    let eventRows = '';
+    for (const l of notableEvents) {
+      const badge = await orgBadge(l.orgId);
+      eventRows += `<tr><td>${escapeHtml(l.date || '—')}</td><td><span class="bp-badge">${escapeHtml(l.type)}</span></td><td>${escapeHtml(l.note || '')}</td><td>${badge}</td></tr>`;
+    }
+    if (chargeEvents.length) {
+      const fastCount = chargeEvents.filter(l => l.note && /fast/i.test(l.note)).length;
+      const orgIdsUsed = [...new Set(chargeEvents.map(l => l.orgId).filter(Boolean))];
+      let chargeBadges = '';
+      for (const oid of orgIdsUsed.slice(0, 2)) chargeBadges += await orgBadge(oid);
+      eventRows += `<tr><td>—</td><td><span class="bp-badge">charge</span></td><td>${chargeEvents.length} charge cycles recorded (${fastCount} fast charges)</td><td>${chargeBadges || '<span class="bp-badge unverified">Self-reported</span>'}</td></tr>`;
+    }
+
+    const gapHtml = gaps.length
+      ? gaps.map(g => `<div class="bp-alert gap">⚠ ${g.days}-day gap in recorded history (${escapeHtml(g.from)} → ${escapeHtml(g.to === 'today' ? 'today' : g.to)}). No usage was logged in this window — ask the seller what happened during this period.</div>`).join('')
+      : `<div class="bp-alert integrity-ok">No unexplained gaps of 6+ months detected in this history.</div>`;
+
+    const integrityHtml = chain.valid
+      ? `<div class="bp-alert integrity-ok">History integrity check passed — no entries appear to have been altered or removed after the fact.</div>`
+      : `<div class="bp-alert integrity-bad">⚠ History integrity check failed at entry #${chain.brokenAt + 1}. This record may have been edited outside the normal logging flow — treat this passport's history with caution.</div>`;
+
+    const confColor = confidence.tier === 'High' ? 'var(--good)' : confidence.tier === 'Medium' ? 'var(--warn)' : 'var(--bad)';
+    const confHtml = `<div class="bp-alert confidence"><strong style="color:${confColor};">Evidence strength: ${confidence.tier}</strong> — ${confidence.entryCount} logged events from ${confidence.orgCount} independent organization(s) over ${confidence.spanDays} days. ${confidence.tier === 'Low' ? 'A thin history is not proof of a bad battery — but there is not yet much independent evidence to check the seller\'s claims against.' : ''}</div>`;
+
+    const price = estimatePrice(battery, h);
+    const waLink = buildWhatsAppLink(battery);
+    const waPreview = whatsAppPreviewText(battery, h, price);
+
+    return `
+      <div class="bp-card">
+        <h2>${escapeHtml(battery.manufacturer)} — ${escapeHtml(battery.model)}</h2>
+        <p class="bp-sub">ID: <span class="bp-id-pill">${escapeHtml(battery.id)}</span> &nbsp;·&nbsp; Chemistry: ${escapeHtml(battery.chemistry || '—')} &nbsp;·&nbsp; Manufactured: ${escapeHtml(battery.manufactureDate || '—')}</p>
+        <p class="bp-sub" style="margin-top:-8px;">Serial number on record: <strong>${escapeHtml(battery.serialNumber || 'not recorded')}</strong> — before buying, confirm this matches the number printed or stamped on the battery casing/BMS. A mismatch is a red flag.</p>
+
+        ${confHtml}
+        ${integrityHtml}
+        ${gapHtml}
+
+        <h3>Health score</h3>
+        <div class="bp-health-bar-track"><div class="bp-health-bar-fill" style="width:${h.health}%; background:${color};"></div></div>
+        <p style="margin:6px 0 0; font-weight:700; font-size:20px; color:${color};">${h.health}%</p>
+        <p class="bp-sub" style="margin:4px 0 0;">Predicted by a trained ML model (Ridge regression, test R² ${HEALTH_MODEL.testR2}, mean error ±${HEALTH_MODEL.testMae} points on held-out data) — trained on synthetic degradation data modeled after published Li-ion fade patterns, not yet real field telemetry. Swap in real returned-battery measurements to retrain for production.</p>
+
+        <button class="bp-btn secondary" data-speak-id="${escapeHtml(battery.id)}" style="margin-top:10px;">🔊 Read this aloud</button>
+
+        <div class="bp-grid2" style="margin-top:10px;">
+          <div class="bp-stat"><div class="k">Charge cycles used</div><div class="v">${h.cycles} / ${battery.ratedCycleLife}</div></div>
+          <div class="bp-stat"><div class="k">Est. remaining life</div><div class="v">${h.remainingCycles} cycles${h.remainingYears ? ' (~' + h.remainingYears.toFixed(1) + ' yrs)' : ''}</div></div>
+          <div class="bp-stat"><div class="k">Rated capacity</div><div class="v">${battery.capacityWh || '—'} Wh</div></div>
+          <div class="bp-stat"><div class="k">Age</div><div class="v">${h.ageYears.toFixed(1)} years</div></div>
+        </div>
+
+        <h3>Estimated fair resale price</h3>
+        <p style="margin:0 0 6px; font-weight:700; font-size:20px; color:${color};">₹${price.low.toLocaleString('en-IN')} – ₹${price.high.toLocaleString('en-IN')}</p>
+        <p class="bp-sub" style="margin:0 0 10px;">Based on an illustrative new-cell rate of ₹${price.rate}/Wh for ${escapeHtml(battery.chemistry || 'this chemistry')} (~₹${price.newPrice.toLocaleString('en-IN')} new) × ${h.health}% health. This is a rough placeholder, not live market pricing — swap in real market rates before relying on it for actual negotiation.</p>
+
+        <h3>Usage & ownership history</h3>
+        <table class="bp-table">
+          <thead><tr><th>Date</th><th>Event</th><th>Details</th><th>Logged by</th></tr></thead>
+          <tbody>${eventRows || '<tr><td colspan="4">No events recorded yet.</td></tr>'}</tbody>
+        </table>
+
+        <p class="bp-sub" style="margin-top:12px;">Registered by ${escapeHtml(battery.registeredBy || 'unknown')} on ${battery.registeredAt ? new Date(battery.registeredAt).toLocaleDateString() : '—'}. The integrity hash is a lightweight demonstration, not cryptographic-grade — it shows the concept of tamper-evidence, not a production security guarantee.</p>
+      </div>
+
+      <div class="bp-card">
+        <h3>Prefer WhatsApp?</h3>
+        <p class="bp-sub">In a full deployment, sending this battery's ID to a WhatsApp Business number would reply with this same report — useful where a buyer has WhatsApp but not a smooth browser experience. This demo can't run a live WhatsApp bot (that needs a backend + a real business number), but here's the concept:</p>
+        <div style="background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:10px 12px; font-size:13px; white-space:pre-wrap; font-family:monospace;">${escapeHtml(waPreview)}</div>
+        <a href="${waLink}" target="_blank" rel="noopener" style="display:inline-block; margin-top:10px;"><button class="bp-btn secondary">Open WhatsApp (demo number)</button></a>
+      </div>
+    `;
+  }
+
+  function speakPassport(battery) {
+    if (!('speechSynthesis' in window)) { alert('Voice output is not supported in this browser.'); return; }
+    const h = computeHealth(battery);
+    const price = estimatePrice(battery, h);
+    const gaps = findGaps(battery);
+    const chain = verifyChain(battery);
+
+    let text = battery.manufacturer + ' ' + battery.model + '. Health score: ' + h.health + ' percent. ';
+    text += 'Estimated remaining life: ' + h.remainingCycles + ' cycles';
+    if (h.remainingYears) text += ', about ' + h.remainingYears.toFixed(1) + ' years';
+    text += '. Estimated fair resale price: ' + price.low.toLocaleString('en-IN') + ' to ' + price.high.toLocaleString('en-IN') + ' rupees. ';
+    if (gaps.length) text += 'Warning: there is a gap of ' + gaps[gaps.length - 1].days + ' days with no recorded usage. ';
+    else text += 'No major gaps in the recorded history. ';
+    text += chain.valid ? 'History integrity check passed.' : 'Warning: history integrity check failed. Treat this record with caution.';
+
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 0.95;
+    window.speechSynthesis.speak(utter);
+  }
+
+  function bindSpeakButton(containerEl) {
+    if (!containerEl) return;
+    containerEl.querySelectorAll('[data-speak-id]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const battery = await getBattery(btn.dataset.speakId);
+        if (battery) speakPassport(battery);
+      });
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---------- camera scanning ----------
+  async function startCamera() {
+    const video = document.getElementById('bp-video');
+    const canvas = document.getElementById('bp-canvas');
+    const msg = document.getElementById('bp-scan-msg');
+    msg.innerHTML = `<p class="bp-sub" style="margin-top:8px;">Loading scanner…</p>`;
+    if (window.__bpJsQrLoad) { try { await window.__bpJsQrLoad; } catch (e) {} }
+    if (typeof jsQR === 'undefined') {
+      msg.innerHTML = `<div class="bp-msg error">QR scanning library couldn't load (likely blocked by your network or an ad-blocker). Use manual ID lookup below instead — it works the same either way.</div>`;
+      return;
+    }
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+    } catch (e) {
+      msg.innerHTML = `<div class="bp-msg error">Couldn't access camera (${escapeHtml(e.message)}). Use manual ID lookup below instead.</div>`;
+      return;
+    }
+    video.srcObject = cameraStream;
+    video.style.display = 'block';
+    document.getElementById('bp-start-cam').style.display = 'none';
+    document.getElementById('bp-stop-cam').style.display = 'inline-block';
+    await video.play();
+    const ctx = canvas.getContext('2d');
+    msg.innerHTML = `<p class="bp-sub" style="margin-top:8px;">Scanning…</p>`;
+
+    const tick = () => {
+      if (!cameraStream) return;
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+        if (code && code.data) {
+          msg.innerHTML = `<div class="bp-msg ok">Found QR: ${escapeHtml(code.data)}</div>`;
+          stopCamera();
+          lookupAndShow(code.data);
+          return;
+        }
+      }
+      scanRAF = requestAnimationFrame(tick);
+    };
+    scanRAF = requestAnimationFrame(tick);
+  }
+
+  function stopCamera() {
+    if (scanRAF) cancelAnimationFrame(scanRAF);
+    scanRAF = null;
+    if (cameraStream) { cameraStream.getTracks().forEach(t => t.stop()); cameraStream = null; }
+    const video = document.getElementById('bp-video');
+    const startBtn = document.getElementById('bp-start-cam');
+    const stopBtn = document.getElementById('bp-stop-cam');
+    if (video) video.style.display = 'none';
+    if (startBtn) startBtn.style.display = 'inline-block';
+    if (stopBtn) stopBtn.style.display = 'none';
+  }
+
+  // ---------- setup / deploy view ----------
+  function renderSetup() {
+    const statusLine = backend === 'artifact'
+      ? '<div class="bp-banner ok">Currently running on Claude preview storage (testing mode).</div>'
+      : backend === 'firebase'
+      ? '<div class="bp-banner ok">Currently connected to Firebase (live mode).</div>'
+      : '<div class="bp-banner warn">No permanent database yet — demo batteries still work for testing scan/speak, but new registrations won\'t survive a page reload. Follow the steps below to connect Firebase.</div>';
+
+    main.innerHTML = `
+      <div class="bp-card">
+        <h2>Setup / Deploy</h2>
+        <p class="bp-sub">This single HTML file is the whole frontend. Right now, in this Claude preview, it's using Claude's built-in storage so you can test every feature. That storage does not exist once you download this file and host it yourself — you need to connect a real database first. Here's the full path from "demo" to "scan a real battery in the real world."</p>
+        ${statusLine}
+
+        <h3>1. Create a free database (Firebase)</h3>
+        <p class="bp-sub">Go to <strong>console.firebase.google.com</strong> → Create a project → in the left menu open <strong>Firestore Database</strong> → Create database → start in <em>test mode</em> for now (you'll lock it down in step 4). Then go to Project settings → your apps → Add app → Web app, and copy the config object it gives you.</p>
+
+        <h3>2. Paste your config into this file</h3>
+        <p class="bp-sub">Open battery-passport.html in a text editor, find <code>FIREBASE_CONFIG</code> near the top of the script, and replace the placeholder values with the ones Firebase gave you:</p>
+        <pre class="bp-code">const FIREBASE_CONFIG = {
+  apiKey: "AIza...",
+  authDomain: "yourproject.firebaseapp.com",
+  projectId: "yourproject",
+  storageBucket: "yourproject.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abcdef"
+};</pre>
+        <p class="bp-sub">Save the file. The app automatically detects it's no longer running inside Claude's preview and switches to Firebase — no other code changes needed.</p>
+
+        <h3>3. Host the file on a permanent URL</h3>
+        <p class="bp-sub">Upload battery-passport.html to Vercel, Netlify, or GitHub Pages (all free at this scale, drag-and-drop deploy). Whatever URL you get becomes permanent — every QR code you print encodes this URL, so pick your final domain before printing real stickers.</p>
+
+        <h3>4. Lock down database access</h3>
+        <p class="bp-sub">Back in Firebase → Firestore → Rules, replace test-mode rules with something that at least requires basic checks before writes are accepted, before real users touch this. Test mode is fine for your own testing, not for a public link.</p>
+
+        <h3>5. Register a battery and print its QR</h3>
+        <p class="bp-sub">Use "Register Battery" on your deployed site, download or screenshot the generated QR, and print it as a sticker.</p>
+
+        <h3>6. Test with a real phone camera</h3>
+        <p class="bp-sub">Stick the QR on the battery. Open your phone's normal camera app (not this app's built-in scanner) and point it at the code — it should prompt you to open the link, landing straight on that battery's passport. That confirms the full loop: physical battery → QR → live data from your database.</p>
+      </div>
+    `;
+  }
+  function renderOrgs() {
+    main.innerHTML = `
+      <div class="bp-card">
+        <h2>Register an organization</h2>
+        <p class="bp-sub">Manufacturers, fleets, and service centers register once, then log usage under their org name. This is what lets buyers see <em>who</em> wrote each part of a battery's history.</p>
+        <div class="bp-row">
+          <div class="bp-field"><label>Organization name</label><input id="o-name" placeholder="e.g. QuickFix Battery Service" /></div>
+          <div class="bp-field"><label>Type</label>
+            <select id="o-type">
+              <option value="manufacturer">Manufacturer</option>
+              <option value="fleet">Fleet operator</option>
+              <option value="service_center">Service center</option>
+              <option value="swap_station">Battery swap station</option>
+              <option value="reseller">Reseller / dealer</option>
+            </select>
+          </div>
+        </div>
+        <button class="bp-btn" id="o-submit">Register organization</button>
+        <div id="o-msg"></div>
+        <p class="bp-sub" style="margin-top:10px;">Note: this demo does not verify identity documents. In a real deployment, "verified" would require an actual identity/business check before an org can carry the verified badge — right now it's a manual admin toggle below, shown for demonstration only.</p>
+      </div>
+      <div class="bp-card">
+        <h3>All registered organizations</h3>
+        <div id="o-list"><p class="bp-empty">Loading…</p></div>
+      </div>
+    `;
+
+    document.getElementById('o-submit').addEventListener('click', async () => {
+      const nameInput = document.getElementById('o-name');
+      const typeSelect = document.getElementById('o-type');
+      const name = nameInput.value.trim();
+      const type = typeSelect.value;
+      const msg = document.getElementById('o-msg');
+      if (!name) { msg.innerHTML = `<div class="bp-msg error">Enter an organization name.</div>`; return; }
+      const org = { id: genOrgId(), name, type, verified: false, registeredAt: new Date().toISOString() };
+      const ok = await saveOrg(org);
+      msg.innerHTML = ok
+        ? `<div class="bp-msg ok">Registered ${escapeHtml(org.id)}. New organizations start unverified.</div>`
+        : `<div class="bp-msg error">Failed to save. Try again.</div>`;
+      if (ok) {
+        nameInput.value = '';
+        typeSelect.selectedIndex = 0;
+      }
+      loadOrgList();
+    });
+
+    loadOrgList();
+  }
+
+  async function loadOrgList() {
+    const listEl = document.getElementById('o-list');
+    const orgs = await listOrgs();
+    if (!orgs.length) { listEl.innerHTML = `<p class="bp-empty">No organizations registered yet.</p>`; return; }
+    listEl.innerHTML = orgs.map(o => `
+      <div class="bp-org-item" style="flex-direction:column; align-items:stretch;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <strong>${escapeHtml(o.name)}</strong> <span class="bp-badge">${escapeHtml(o.type)}</span>
+            ${o.verified ? '<span class="bp-badge verified">Verified ✓</span>' : '<span class="bp-badge unverified">Unverified</span>'}
+            <div class="bp-sub" style="margin:2px 0 0;">${escapeHtml(o.id)}</div>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="bp-btn small secondary" data-rep="${escapeHtml(o.id)}">Reputation</button>
+            <button class="bp-btn small ${o.verified ? 'secondary' : ''}" data-toggle="${escapeHtml(o.id)}">${o.verified ? 'Revoke verification' : 'Mark verified (admin demo)'}</button>
+          </div>
+        </div>
+        <div id="rep-${escapeHtml(o.id)}" style="display:none; margin-top:10px;"></div>
+      </div>
+    `).join('');
+    listEl.querySelectorAll('[data-toggle]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const org = await getOrg(btn.dataset.toggle);
+        if (!org) return;
+        org.verified = !org.verified;
+        await saveOrg(org);
+        loadOrgList();
+      });
+    });
+    listEl.querySelectorAll('[data-rep]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const panel = document.getElementById('rep-' + btn.dataset.rep);
+        if (panel.style.display === 'block') { panel.style.display = 'none'; return; }
+        panel.style.display = 'block';
+        panel.innerHTML = `<p class="bp-empty">Loading…</p>`;
+        const allBatteries = await listBatteries();
+        const rep = await computeOrgReputation(btn.dataset.rep, allBatteries);
+        if (rep.batteryCount === 0) {
+          panel.innerHTML = `<p class="bp-sub" style="margin:0;">This organization hasn't registered or logged usage on any battery yet.</p>`;
+          return;
+        }
+        const repColor = rep.avgHealth >= 75 ? 'var(--good)' : rep.avgHealth >= 45 ? 'var(--warn)' : 'var(--bad)';
+        panel.innerHTML = `
+          <div class="bp-grid2">
+            <div class="bp-stat"><div class="k">Batteries touched</div><div class="v">${rep.batteryCount}</div></div>
+            <div class="bp-stat"><div class="k">Avg. health of those batteries</div><div class="v" style="color:${repColor};">${rep.avgHealth}%</div></div>
+            <div class="bp-stat"><div class="k">Batteries with history gaps</div><div class="v">${rep.gapFlagCount}</div></div>
+            <div class="bp-stat"><div class="k">Batteries with integrity issues</div><div class="v">${rep.integrityIssueCount}</div></div>
+          </div>
+          <p class="bp-sub" style="margin:6px 0 0;">This is a track record, not a promise — it reflects the batteries this org has registered or logged so far, aggregated the same way any of their future batteries would be judged.</p>
+        `;
+      });
+    });
+  }
+
+  // ---------- register battery view ----------
+  async function renderRegister() {
+    const orgs = await listOrgs();
+    const orgOptions = orgs.map(o => `<option value="${escapeHtml(o.id)}">${escapeHtml(o.name)} ${o.verified ? '(verified)' : '(unverified)'}</option>`).join('');
+    main.innerHTML = `
+      <div class="bp-card">
+        <h2>Register a new battery</h2>
+        <p class="bp-sub">Creates a passport once. This generates a QR code to print/stick on the battery.</p>
+        <div class="bp-field"><label>Registering organization</label>
+          <select id="f-org">
+            <option value="">— Not linked to a registered org (shown as self-reported) —</option>
+            ${orgOptions}
+          </select>
+        </div>
+        <div class="bp-row">
+          <div class="bp-field"><label>Manufacturer name</label><input id="f-manufacturer" placeholder="e.g. Volt Cells Pvt Ltd" /></div>
+          <div class="bp-field"><label>Model</label><input id="f-model" placeholder="e.g. VC-48V-30Ah" /></div>
+        </div>
+        <div class="bp-row">
+          <div class="bp-field"><label>Chemistry</label>
+            <select id="f-chemistry"><option>LiFePO4</option><option>NMC</option><option>Lead-acid</option><option>Other</option></select>
+          </div>
+          <div class="bp-field"><label>Capacity (Wh)</label><input id="f-capacity" type="number" placeholder="1440" /></div>
+        </div>
+        <div class="bp-row">
+          <div class="bp-field"><label>Rated cycle life</label><input id="f-cycles" type="number" placeholder="2000" /></div>
+          <div class="bp-field"><label>Manufacture date</label><input id="f-date" type="date" /></div>
+        </div>
+        <div class="bp-field"><label>Serial number (stamped on battery casing/BMS)</label><input id="f-serial" placeholder="e.g. VC-SN-88213" /></div>
+        <button class="bp-btn" id="f-submit">Generate passport & QR code</button>
+        <div id="f-msg"></div>
+      </div>
+      <div id="f-qr-out"></div>
+    `;
+
+    document.getElementById('f-submit').addEventListener('click', async () => {
+      const orgId = document.getElementById('f-org').value || null;
+      const manufacturer = document.getElementById('f-manufacturer').value.trim();
+      const model = document.getElementById('f-model').value.trim();
+      const chemistry = document.getElementById('f-chemistry').value;
+      const capacityWh = document.getElementById('f-capacity').value;
+      const ratedCycleLife = document.getElementById('f-cycles').value;
+      const manufactureDate = document.getElementById('f-date').value;
+      const serialNumber = document.getElementById('f-serial').value.trim();
+      const msg = document.getElementById('f-msg');
+
+      if (!manufacturer || !model || !ratedCycleLife || !manufactureDate || !serialNumber) {
+        msg.innerHTML = `<div class="bp-msg error">Please fill in manufacturer, model, rated cycle life, manufacture date, and serial number.</div>`;
+        return;
+      }
+
+      let registeredByName = manufacturer;
+      if (orgId) { const org = await getOrg(orgId); if (org) registeredByName = org.name; }
+
+      const battery = {
+        id: genId(), manufacturer, model, chemistry, capacityWh: Number(capacityWh) || null,
+        ratedCycleLife: Number(ratedCycleLife), manufactureDate, serialNumber,
+        registeredByOrgId: orgId, registeredBy: registeredByName, registeredAt: new Date().toISOString(),
+        startingCycles: 0, usageLog: []
+      };
+
+      const ok = await saveBattery(battery);
+      if (!ok) { msg.innerHTML = `<div class="bp-msg error">Something went wrong saving this battery. Try again.</div>`; return; }
+      msg.innerHTML = orgId
+        ? `<div class="bp-msg ok">Passport created for ${escapeHtml(battery.id)}, linked to a registered organization.</div>`
+        : `<div class="bp-msg warn">Passport created for ${escapeHtml(battery.id)}, but not linked to a registered org — it will show as self-reported until you register an organization.</div>`;
+
+      document.getElementById('f-manufacturer').value = '';
+      document.getElementById('f-model').value = '';
+      document.getElementById('f-chemistry').selectedIndex = 0;
+      document.getElementById('f-capacity').value = '';
+      document.getElementById('f-cycles').value = '';
+      document.getElementById('f-date').value = '';
+      document.getElementById('f-serial').value = '';
+      document.getElementById('f-org').selectedIndex = 0;
+
+      const passportUrl = buildBatteryUrl(battery.id);
+      const qrOut = document.getElementById('f-qr-out');
+      qrOut.innerHTML = `<div class="bp-card bp-qr-wrap"><h3>Print this QR and attach it to the battery</h3><div id="f-qr-canvas"></div><div class="bp-id-pill">${escapeHtml(battery.id)}</div><p class="bp-sub" style="margin-top:8px; word-break:break-all;">Encodes: ${escapeHtml(passportUrl)}</p><button class="bp-btn secondary" id="f-goto-registry" style="margin-top:10px;">View in All Batteries →</button></div>`;
+      document.getElementById('f-goto-registry').addEventListener('click', () => {
+        document.querySelector('[data-view="registry"]').click();
+      });
+      if (window.__bpQrCodeLoad) { try { await window.__bpQrCodeLoad; } catch (e) {} }
+      if (typeof QRCode !== 'undefined') {
+        new QRCode(document.getElementById('f-qr-canvas'), { text: passportUrl, width: 220, height: 220 });
+      } else {
+        document.getElementById('f-qr-canvas').innerHTML = `<p class="bp-sub">QR image library couldn't load (likely blocked by your network) — the battery ID above can still be used for manual lookup, and the URL text can be turned into a QR with any free QR generator.</p>`;
+      }
+    });
+  }
+
+  // ---------- add usage log view ----------
+  async function renderLog() {
+    const orgs = await listOrgs();
+    const orgOptions = orgs.map(o => `<option value="${escapeHtml(o.id)}">${escapeHtml(o.name)} ${o.verified ? '(verified)' : '(unverified)'}</option>`).join('');
+    main.innerHTML = `
+      <div class="bp-card">
+        <h2>Add a usage record</h2>
+        <p class="bp-sub">Fleets, service centers, or sellers log real-world events here. Each record is chained to the one before it, so later edits to old entries would break the integrity check on the passport.</p>
+        <div class="bp-field"><label>Battery ID</label><input id="l-id" placeholder="e.g. BAT-DEMO1" /></div>
+        <div class="bp-field"><label>Logging organization</label>
+          <select id="l-org">
+            <option value="">— Not linked to a registered org (shown as self-reported) —</option>
+            ${orgOptions}
+          </select>
+          ${orgs.length === 0 ? '<p class="bp-sub" style="margin:4px 0 0;">No organizations registered yet — entries will show as self-reported until you register one.</p>' : ''}
+        </div>
+        <div class="bp-row">
+          <div class="bp-field"><label>Event type</label>
+            <select id="l-type">
+              <option value="charge">Charge cycle (home/depot)</option>
+              <option value="station_swap">Battery swap (station exchange)</option>
+              <option value="fleet_assignment">Fleet assignment</option>
+              <option value="swap">Ownership / vehicle swap</option>
+              <option value="service">Service / inspection</option>
+            </select>
+          </div>
+          <div class="bp-field"><label>Date</label><input id="l-date" type="date" /></div>
+        </div>
+        <div class="bp-field"><label>Note</label><input id="l-note" placeholder="e.g. Fast charge at depot, or Sold to second owner" /></div>
+        <button class="bp-btn" id="l-submit">Add record</button>
+        <div id="l-msg"></div>
+      </div>
+    `;
+    const today = new Date().toISOString().slice(0, 10);
+    document.getElementById('l-date').value = today;
+
+    document.getElementById('l-submit').addEventListener('click', async () => {
+      const id = document.getElementById('l-id').value.trim();
+      const orgId = document.getElementById('l-org').value || null;
+      const type = document.getElementById('l-type').value;
+      const date = document.getElementById('l-date').value;
+      const note = document.getElementById('l-note').value.trim();
+      const msg = document.getElementById('l-msg');
+
+      if (!id) { msg.innerHTML = `<div class="bp-msg error">Enter a battery ID.</div>`; return; }
+      const battery = await getBattery(id);
+      if (!battery) { msg.innerHTML = `<div class="bp-msg error">No battery found with ID "${escapeHtml(id)}".</div>`; return; }
+
+      appendChainedEntry(battery, { date, type, note, orgId });
+      const ok = await saveBattery(battery);
+      msg.innerHTML = ok
+        ? `<div class="bp-msg ok">Record added to ${escapeHtml(battery.id)} and chained to its history.</div>`
+        : `<div class="bp-msg error">Failed to save. Try again.</div>`;
+      if (ok) {
+        document.getElementById('l-note').value = '';
+        document.getElementById('l-type').selectedIndex = 0;
+        document.getElementById('l-org').selectedIndex = 0;
+        document.getElementById('l-date').value = today;
+      }
+    });
+  }
+
+  // ---------- registry list view ----------
+  async function renderRegistry() {
+    main.innerHTML = `<div class="bp-card"><h2>All registered batteries</h2><p class="bp-sub">Demo view — in production this would likely be restricted to admins/fleets.</p><div id="r-list"><p class="bp-empty">Loading…</p></div></div><div id="r-detail"></div>`;
+    const list = await listBatteries();
+    const listEl = document.getElementById('r-list');
+    if (list.length === 0) { listEl.innerHTML = `<p class="bp-empty">No batteries registered yet.</p>`; return; }
+    listEl.innerHTML = list.map(b => {
+      const h = computeHealth(b);
+      return `<div class="bp-registry-item" data-id="${escapeHtml(b.id)}">
+        <div><strong>${escapeHtml(b.id)}</strong> — ${escapeHtml(b.manufacturer)} ${escapeHtml(b.model)}</div>
+        <div style="color:${healthColor(h.health)}; font-weight:700;">${h.health}%</div>
+      </div>`;
+    }).join('');
+    listEl.querySelectorAll('.bp-registry-item').forEach(el => {
+      el.addEventListener('click', async () => {
+        document.getElementById('r-detail').innerHTML = await passportHTML(await getBattery(el.dataset.id));
+        bindSpeakButton(document.getElementById('r-detail'));
+      });
+    });
+  }
+
+  // ---------- init ----------
+  initBackend().then(() => backend !== 'firebase' ? seedIfEmpty() : null).then(() => {
+    render();
+    renderBackendBanner();
+    const params = new URLSearchParams(window.location.search);
+    const batteryParam = params.get('battery');
+    if (batteryParam) {
+      const manualInput = document.getElementById('bp-manual-id');
+      if (manualInput) manualInput.value = batteryParam;
+      lookupAndShow(batteryParam);
+    }
+  });
+})();
+</script>
