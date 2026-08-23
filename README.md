@@ -4,7 +4,7 @@
 
 A QR-scannable digital passport for EV/e-rickshaw batteries — scan a code and instantly see manufacturer info, independently-logged usage history, a trained ML-predicted health score, estimated remaining life, and a fair resale price estimate. No app download, no embedded IoT hardware required.
 
-**Live demo:** [your Netlify URL here]
+**Live demo:** (https://ind-ev-battery-passport.netlify.app/)
 
 ---
 
@@ -49,15 +49,6 @@ Just open `battery-passport.html` in any modern browser. It runs in a demo/in-me
 
 Full step-by-step instructions are also built into the app itself under the **Setup / Deploy** tab.
 
-### Deploy
-Any static host works — this is a single HTML file with no build step. Drag-and-drop deploy to [Netlify](https://netlify.com) or [Vercel](https://vercel.com), or push to a repo and enable GitHub Pages.
-
-**Important:** whatever URL you deploy to becomes permanently encoded into every QR code you generate afterward — pick your final domain before printing real stickers.
-
-## Known Limitations
-
-This is a hackathon-stage prototype. Being upfront about what's real vs. placeholder:
-
 | Area | Current state |
 |---|---|
 | Health scoring | Real trained ML model, but trained on **synthetic** data modeled after published degradation curves — not real fleet telemetry yet |
@@ -81,5 +72,5 @@ MIT — see [LICENSE](./LICENSE).
 
 ## Team
 
-[Your Team Name] — [Name 1], [Name 2], [Name 3], [Name 4]
+[GLINT] — [Grecia], [Tejaswi], [Hasita]
 Built for Smart City Hackathon 2026 — Theme: Energy Solutions
