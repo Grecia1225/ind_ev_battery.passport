@@ -1,0 +1,15 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+
+# Environment / secrets (if you ever move config out of the HTML file)
+.env
+.env.local
+
+# Dependency directories (only relevant if you later add a build step)
+node_modules/
